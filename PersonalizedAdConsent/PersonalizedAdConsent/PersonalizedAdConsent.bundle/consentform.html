@@ -677,11 +677,7 @@
         return;
       }
 
-      // Consent not required if request is not EEA or unknown.
-      if (!consentInfo['is_request_in_eea_or_unknown']) {
-        formLoadCompleted('Error: request is not in EEA or unknown.');
-        return;
-      }
+      var requestInEEAOrUnknown = consentInfo['is_request_in_eea_or_unknown'] || false;
 
       // Set app name.
       var appName = formInfo['app_name'] || '';
@@ -745,7 +741,7 @@
       }
       var hasAnyNonPersonalizedOnlyPubId = consentInfo['has_any_npa_pub_id'] || false;
       if (!formInfo['offer_personalized'] ||
-          !hasValidProviderCount ||
+          (!hasValidProviderCount && requestInEEAOrUnknown) ||
           hasAnyNonPersonalizedOnlyPubId) {
         obj.btn0El.parentNode.removeChild(obj.btn0El);
       }
@@ -754,6 +750,11 @@
       }
       if (!formInfo['offer_ad_free']) {
         obj.btn2El.parentNode.removeChild(obj.btn2El);
+      }
+
+      // Change data usage link to directly showp privacy policy if not in EEA or Unknown
+      if (!requestInEEAOrUnknown) {
+        obj.headLearnDataUsageEl.onclick = showAppPrivacyPolicy;
       }
 
       // Form must have at least one of the personalized or non-personalized options.
@@ -808,6 +809,7 @@
       obj.headQuestionEl = document.getElementById('head_question');
       obj.headDetailChangeEl = document.getElementById('change_anytime_text1');
       obj.headDetailTextEl = document.getElementById('head_detail_text');
+      obj.headLearnDataUsageEl = document.getElementById('learn_about_data_usage');
       obj.buttonsEl = document.getElementById('buttons');
       obj.btn0El = document.getElementById('btn0');
       obj.btn1El = document.getElementById('btn1');
@@ -849,7 +851,7 @@
             <div class="head_detail">
               <span id="change_anytime_text1">You can change your choice anytime for <span class="app_name">App Name</span> in the app settings.</span>
               <span id="head_detail_text">Our partners will collect data and use a unique identifier on your device to show you ads.
-                <a href="#" onclick="showProviders();">Learn how <span class="app_name">App Name</span> and our <span id="providers_count"></span> partners collect and use data</a>
+                <a id="learn_about_data_usage" href="#" onclick="showProviders();">Learn how <span class="app_name">App Name</span> and our <span id="providers_count"></span> partners collect and use data</a>
               </span>
             </div>
           </div>
