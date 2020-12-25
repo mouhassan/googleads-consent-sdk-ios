@@ -141,6 +141,7 @@ static NSDictionary<NSString *, NSString *> *_Nonnull PACQueryParametersFromURL(
   WKWebView *_webView;
   NSDictionary<PACFormKey, id> *_formInformation;
   PACLoadCompletion _loadCompletionHandler;
+  NSDictionary<NSString *, NSString *> *_localizationStrings;
 }
 
 - (instancetype)initWithFrame:(CGRect)frame {
@@ -214,6 +215,29 @@ static NSDictionary<NSString *, NSString *> *_Nonnull PACQueryParametersFromURL(
   [_webView loadRequest:URLRequest];
 }
 
+/// Prepare localization strings dictionary
+- (void)prepareLocalizationStrings:(NSArray<NSString *> *) strings {
+  NSString *localizationTable = @"PersonalizedAdConsent";
+  // check if localization in class bundle
+  NSBundle *bundle = [NSBundle bundleForClass:[self class]];
+  if (![bundle URLForResource:localizationTable withExtension:@"strings"]) {
+    // try the main bundle
+    bundle = [NSBundle mainBundle];
+    if (![bundle URLForResource:localizationTable withExtension:@"strings"]) {
+      // no localization found
+      return;
+    }
+  }
+  
+  NSMutableDictionary *localizationStrings = [[NSMutableDictionary alloc] init];
+  for (NSString *string in strings) {
+    NSString *localizedString = [bundle localizedStringForKey:string value:string table:localizationTable];
+    [localizationStrings setValue:localizedString forKey:string];
+  }
+  
+  self->_localizationStrings = localizationStrings;
+}
+
 /// Updates the web view with consent form and app information.
 - (void)updateWebViewInformation {
   dispatch_async(dispatch_get_main_queue(), ^{
@@ -224,9 +248,20 @@ static NSDictionary<NSString *, NSString *> *_Nonnull PACQueryParametersFromURL(
     mutableFormInformation[PACFormKeyPlatform] = @"ios";
 
     NSString *infoString = PACJSONStringForDictionary(mutableFormInformation);
+    
+    NSString *localizationString;
+    if (self->_localizationStrings) {
+      localizationString = PACJSONStringForDictionary(self->_localizationStrings);
+    } else {
+      localizationString =@"{}";
+    }
+    
     NSString *command =
-        PACCreateJavaScriptCommandString(@"setUpConsentDialog", @{@"info" : infoString});
+    PACCreateJavaScriptCommandString(@"setUpConsentDialog", @{@"info" : infoString, @"localization": localizationString});
     [self->_webView evaluateJavaScript:command completionHandler:nil];
+    
+    // _localizationStrings no longer needed
+    self->_localizationStrings = nil;
   });
 }
 
@@ -331,6 +366,11 @@ static NSDictionary<NSString *, NSString *> *_Nonnull PACQueryParametersFromURL(
       PACQueryParametersFromURL(navigationAction.request.URL);
   NSString *action = parameters[@"action"];
   NSCAssert(action.length > 0, @"Messages must have actions.");
+  
+  if ([action isEqual:@"localization"]) {
+    NSArray *localizableStrings = [parameters allValues];
+    [self prepareLocalizationStrings:localizableStrings];
+  }
 
   if ([action isEqual:@"load_complete"]) {
     NSString *statusString = parameters[@"status"];
